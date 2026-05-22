@@ -290,13 +290,15 @@ The encoder MUST signal stream completion using the final chunk flag in the AEAD
 
 ### Encoder Requirements
 
-1. The **final chunk** (last chunk in the stream) MUST set `is_final=True` in its AEAD nonce (flag byte = `0x01`).
+1. The **final chunk** (last chunk in the stream) MUST set `is_final=True` in its AEAD nonce (flag byte = `0x01`). This signals stream termination to the decoder.
 
-2. If the stream ends with no pending plaintext data, the encoder MUST emit an **empty final chunk**:
+2. The final chunk MAY contain plaintext of any valid length (0–65536 bytes).
+
+3. If the encoder has no more plaintext to send after emitting all data chunks, it MUST send an additional empty chunk with `is_final=True`:
    - Length: `0x00000010` (4-byte big-endian integer = 16)
    - Ciphertext: 16 bytes (encryption of zero-length plaintext)
 
-3. Zero-length chunks with `is_final=False` (flag=`0x00`) are valid non-final chunks.
+4. Zero-length chunks with `is_final=False` (flag=`0x00`) are valid non-final chunks.
 
 ### Decoder Algorithm
 
@@ -356,8 +358,7 @@ A stream is **truncated** if the transport reaches EOF before receiving a chunk 
 **MUST:**
 - Generate a unique 16-byte file key using a CSPRNG
 - Generate a unique 16-byte payload nonce using a CSPRNG
-- Set `is_final=True` on the last chunk
-- Emit an empty final chunk if no plaintext remains at stream end
+- Emit a chunk with `is_final=True` to finalize the stream (MAY be empty or non-empty)
 - Validate chunk plaintext does not exceed 65536 bytes (`MAX_CHUNK_PLAINTEXT`)
 - Encode length as 4-byte big-endian unsigned integer
 - Use the identifier `github.com/parsimonit/age-rt-encryption/v0.2`
@@ -450,7 +451,7 @@ Without the final chunk requirement and truncation detection:
 - An attacker could strip trailing chunks from a stream
 - Recipient would accept partial data as complete
 
-The `is_final` flag and mandatory empty final chunk ensure integrity of stream boundaries.
+The `is_final` flag ensures integrity of stream boundaries by requiring explicit stream termination.
 
 ### Scrypt Work Factor
 
@@ -469,12 +470,6 @@ Using `S = b"age-encryption.org/v1/scrypt" || salt` (identical to age v1) enable
 - **RFC 5869:** HMAC-based Extract-and-Expand Key Derivation Function (HKDF)
 - **RFC 7748:** Elliptic Curves for Security (X25519)
 - **RFC 7914:** The scrypt Password-Based Key Derivation Function
-
----
-
-## Appendix A: Test Vectors
-
-(To be added in future revision. Reference implementation available at: [github.com/parsimonit/zebrastream-age-rt](https://github.com/parsimonit/zebrastream-age-rt))
 
 ---
 
